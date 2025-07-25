@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Florida Storm Radar & Beach Cams</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    html, body { margin: 0; height: 100%; }
+    #map { height: 100%; width: 100%; }
+    .popup-btn {
+      display: inline-block;
+      margin-top: 5px;
+      padding: 5px 10px;
+      background: #0077cc;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+    .popup-btn:hover { background: #005fa3; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // Initialize map on Florida
+    const map = L.map('map').setView([28, -82], 6);
+
+    // Dark basemap
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OSM & Carto',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Add live radar (RainViewer public tiles)
+    const radarLayer = L.tileLayer(
+      'https://tilecache.rainviewer.com/v2/radar/{time}/256/{z}/{x}/{y}/2/1_1.png',
+      {
+        tileSize: 256,
+        opacity: 0.6,
+        zIndex: 10,
+        attribution: 'Radar © RainViewer'
+      }
+    ).addTo(map);
+
+    // Fetch latest radar timestamp automatically
+    fetch('https://api.rainviewer.com/public/weather-maps.json')
+      .then(res => res.json())
+      .then(data => {
+        const latest = data.radar.nowcast[0].time; // Latest radar frame
+        radarLayer.setUrl(
+          `https://tilecache.rainviewer.com/v2/radar/${latest}/256/{z}/{x}/{y}/2/1_1.png`
+        );
+      });
+
+    // Beach & hotel cams
+    const cameras = [
+      { name: "Clearwater Beach", coords: [27.977, -82.827], url: "https://www.earthcam.com/usa/florida/clearwaterbeach/?cam=clearwaterbeach" },
+      { name: "Miami Beach", coords: [25.790, -80.130], url: "https://www.earthcam.com/usa/florida/miamiandthebeaches/?cam=miamibeach_hd" },
+      { name: "Pensacola Beach", coords: [30.335, -87.137], url: "https://www.earthcam.com/usa/florida/pensacola/?cam=pensacola" },
+      { name: "Key West (Mallory Square)", coords: [24.555, -81.782], url: "https://www.earthcam.com/usa/florida/keywest/?cam=mallorysquare" },
+      { name: "Panama City Beach", coords: [30.176, -85.805], url: "https://www.earthcam.com/usa/florida/panamacity/?cam=panamacitybeach" },
+      { name: "Gulf Shores, AL", coords: [30.246, -87.700], url: "https://www.earthcam.com/usa/alabama/gulfshores/?cam=gulfshores" },
+      { name: "Hotel Zamora (St. Pete Beach)", coords: [27.740, -82.750], url: "https://www.youtube.com/watch?v=4w7xZTHdW6g" }
+    ];
+
+    cameras.forEach(cam => {
+      L.marker(cam.coords).addTo(map)
+        .bindPopup(`
+          <b>${cam.name}</b><br>
+          <a class="popup-btn" href="${cam.url}" target="_blank">Watch Live</a>
+        `);
+    });
+  </script>
+</body>
+</html>
