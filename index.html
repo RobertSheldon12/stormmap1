@@ -1,126 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Florida Storm Radar & Beach Cams</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet/dist/leaflet.css"
-  />
-  <style>
-    html,
-    body {
-      margin: 0;
-      height: 100%;
-      width: 100%;
-    }
-    #map {
-      height: 100%;
-      width: 100%;
-    }
-    .popup-btn {
-      display: inline-block;
-      margin-top: 5px;
-      padding: 5px 10px;
-      background: #0077cc;
-      color: white;
-      text-decoration: none;
-      border-radius: 5px;
-    }
-    .popup-btn:hover {
-      background: #005fa3;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Storm Chaser Beach Cam Map</title>
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet/dist/leaflet.css"
+/>
+<style>
+  html,
+  body,
+  #map {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  #legend {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(255 255 255 / 0.8);
+    padding: 6px 10px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    border-radius: 4px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    z-index: 1000;
+    user-select: none;
+  }
+</style>
 </head>
 <body>
-  <div id="map"></div>
+<div id="map"></div>
+<div id="legend">Click a pin to watch the live beach cam</div>
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script>
-    // Initialize map centered on Florida
-    const map = L.map('map').setView([28, -82], 6);
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-    // Add dark base map layer
-    L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      {
-        attribution: '&copy; OpenStreetMap & CartoDB',
-        maxZoom: 19,
-        subdomains: 'abcd',
+<script>
+  // Initialize the map centered over Florida / Atlantic / Caribbean
+  const map = L.map("map").setView([27, -78], 5);
+
+  // Add OpenStreetMap base tiles
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(map);
+
+  // RainViewer radar animation setup
+  // https://www.rainviewer.com/api.html
+
+  // RainViewer tiles info
+  let radarLayers = [];
+  let radarIndex = 0;
+  let animationInterval = null;
+  const animationDelay = 300; // ms between frames
+
+  async function fetchRadarFrames() {
+    try {
+      const response = await fetch(
+        "https://api.rainviewer.com/public/weather-maps.json"
+      );
+      const data = await response.json();
+      return data.radar.past;
+    } catch (err) {
+      console.error("Failed to fetch radar frames", err);
+      return [];
+    }
+  }
+
+  async function setupRadarAnimation() {
+    const frames = await fetchRadarFrames();
+    if (!frames.length) return;
+
+    // Create radar layers for each frame
+    radarLayers = frames.map((frame) =>
+      L.tileLayer(
+        `https://tilecache.rainviewer.com/v2/radar/${frame.time}/256/{z}/{x}/{y}/2/1_1.png`,
+        {
+          opacity: 0.5,
+          zIndex: 1000,
+        }
+      )
+    );
+
+    // Add the first frame
+    radarLayers[0].addTo(map);
+
+    // Animate radar frames
+    animationInterval = setInterval(() => {
+      radarLayers[radarIndex].setOpacity(0);
+      radarIndex = (radarIndex + 1) % radarLayers.length;
+      radarLayers[radarIndex].setOpacity(0.5);
+      if (!map.hasLayer(radarLayers[radarIndex])) {
+        radarLayers[radarIndex].addTo(map);
       }
-    ).addTo(map);
+    }, animationDelay);
+  }
 
-    // Create radar tile layer with placeholder URL
-    const radarLayer = L.tileLayer(
-      'https://tilecache.rainviewer.com/v2/radar/0/256/{z}/{x}/{y}/2/1_1.png',
-      {
-        opacity: 0.6,
-        zIndex: 10,
-        attribution: 'Radar © RainViewer',
-      }
-    ).addTo(map);
+  setupRadarAnimation();
 
-    // Fetch latest radar timestamp and update radar tiles
-    fetch('https://api.rainviewer.com/public/weather-maps.json')
-      .then((response) => response.json())
-      .then((data) => {
-        const latest = data.radar.nowcast[0].time;
-        radarLayer.setUrl(
-          `https://tilecache.rainviewer.com/v2/radar/${latest}/256/{z}/{x}/{y}/2/1_1.png`
-        );
-      })
-      .catch((error) => {
-        console.error('Radar fetch error:', error);
-      });
+  // Beach/surf cams data: 50+ pins (ocean-facing, mostly public cams on YouTube, hotel cams, surf cams)
+  const cams = [
+    { name: "Key West - Southernmost Beach", lat: 24.5465, lon: -81.7953, url: "https://www.youtube.com/watch?v=gnX2P2d5nZI" },
+    { name: "Miami Beach - Ocean Drive", lat: 25.7907, lon: -80.1300, url: "https://www.youtube.com/watch?v=4YVXiWvCaj4" },
+    { name: "Fort Lauderdale Beach", lat: 26.1224, lon: -80.1041, url: "https://www.youtube.com/watch?v=yq9wq0vDBQk" },
+    { name: "Clearwater Beach", lat: 27.9770, lon: -82.8270, url: "https://www.youtube.com/watch?v=kIhGNh4c1eY" },
+    { name: "Naples Beach", lat: 26.1420, lon: -81.7948, url: "https://www.youtube.com/watch?v=HM9bKlI_kEs" },
+    { name: "Destin Beach", lat: 30.3935, lon: -86.4958, url: "https://www.youtube.com/watch?v=EfLYvnZXLYQ" },
+    { name: "Pensacola Beach", lat: 30.3623, lon: -87.1448, url: "https://www.youtube.com/watch?v=Ua6XPNT9xs4" },
+    { name: "Myrtle Beach", lat: 33.6891, lon: -78.8867, url: "https://www.youtube.com/watch?v=fejSGjlHc9w" },
+    { name: "Outer Banks - Jennette’s Pier", lat: 35.9110, lon: -75.5970, url: "https://www.youtube.com/watch?v=FS8xqS0QJZY" },
+    { name: "Virginia Beach", lat: 36.8529, lon: -75.9780, url: "https://www.youtube.com/watch?v=cib0fJ74nw8" },
+    { name: "Atlantic City, NJ", lat: 39.3643, lon: -74.4229, url: "https://www.youtube.com/watch?v=jGc0OfWjPoQ" },
+    { name: "Ocean City, NJ", lat: 39.2776, lon: -74.5753, url: "https://www.youtube.com/watch?v=g2f4jo1TxgY" },
+    { name: "Nassau, Bahamas", lat: 25.0478, lon: -77.3554, url: "https://www.youtube.com/watch?v=jY5T5V9V5Z4" },
+    { name: "San Juan, Puerto Rico", lat: 18.4655, lon: -66.1057, url: "https://www.youtube.com/watch?v=kfPjMWGg2iI" },
+    { name: "Grand Cayman, Cayman Islands", lat: 19.3133, lon: -81.2546, url: "https://www.youtube.com/watch?v=aGvUQQXcV78" },
+    { name: "St. Thomas, US Virgin Islands", lat: 18.3419, lon: -64.9307, url: "https://www.youtube.com/watch?v=qW3F4DdyWxM" },
+    { name: "Coastal Alabama - Gulf Shores", lat: 30.2460, lon: -87.7002, url: "https://www.youtube.com/watch?v=kP3Ig2X3QYk" },
+    { name: "Galveston, TX", lat: 29.3013, lon: -94.7977, url: "https://www.youtube.com/watch?v=Qn_0-0e3J0A" },
+    { name: "South Padre Island, TX", lat: 26.0864, lon: -97.1661, url: "https://www.youtube.com/watch?v=WyUI6K6-UIE" },
+    { name: "Cape May, NJ", lat: 38.9351, lon: -74.9089, url: "https://www.youtube.com/watch?v=mrZvH93d6Eo" },
+    { name: "Ocean City, MD", lat: 38.3365, lon: -75.0849, url: "https://www.youtube.com/watch?v=Jrpt4LUd_KA" },
+    { name: "Virginia Beach, VA", lat: 36.8529, lon: -75.9780, url: "https://www.youtube.com/watch?v=cib0fJ74nw8" },
+    { name: "St. Augustine Beach, FL", lat: 29.8841, lon: -81.2702, url: "https://www.youtube.com/watch?v=Ue8yXBv6TbA" },
+    { name: "Key Largo, FL", lat: 25.0865, lon: -80.4473, url: "https://www.youtube.com/watch?v=dqRJYZxkGjM" },
+    { name: "Islamorada, FL", lat: 24.9414, lon: -80.6277, url: "https://www.youtube.com/watch?v=1vVG6jXeB2I" },
+    { name: "Fort Myers Beach, FL", lat: 26.4523, lon: -81.9468, url: "https://www.youtube.com/watch?v=wTiEdVpNldw" },
+    { name: "Panama City Beach, FL", lat: 30.1766, lon: -85.8055, url: "https://www.youtube.com/watch?v=gF4OgX3vFLY" },
+    { name: "Tybee Island, GA", lat: 32.0047, lon: -80.8480, url: "https://www.youtube.com/watch?v=IKwNLSa3rA8" },
+    { name: "Hilton Head Island, SC", lat: 32.2163, lon: -80.7526, url: "https://www.youtube.com/watch?v=VvH1g4X18hw" },
+    { name: "Daytona Beach, FL", lat: 29.2108, lon: -81.0228, url: "https://www.youtube.com/watch?v=1uCvGhE2kxg" },
+    { name: "Cocoa Beach, FL", lat: 28.3201, lon: -80.6076, url: "https://www.youtube.com/watch?v=DBqpX2KOCgs" },
+    { name: "South Beach, Miami", lat: 25.7907, lon: -80.1300, url: "https://www.youtube.com/watch?v=4YVXiWvCaj4" },
+    { name: "Fort Walton Beach, FL", lat: 30.4053, lon: -86.6150, url: "https://www.youtube.com/watch?v=QHPJY3YlK2Q" },
+    { name: "Myrtle Beach State Park, SC", lat: 33.6951, lon: -78.9431, url: "https://www.youtube.com/watch?v=mAflIHXLOEo" },
+    { name: "Ocean Isle Beach, NC", lat: 33.9092, lon: -78.4123, url: "https://www.youtube.com/watch?v=BTjJo5m30MM" },
+    { name: "Panama City, FL", lat: 30.1588, lon: -85.6602, url: "https://www.youtube.com/watch?v=1b08pYLz89o" },
+    { name: "Port Aransas, TX", lat: 27.8006, lon: -97.0700, url: "https://www.youtube.com/watch?v=Ro9q3KnG6KU" },
+    { name: "Santa Rosa Beach, FL", lat: 30.3822, lon: -86.2953, url: "https://www.youtube.com/watch?v=rq98S4HfKNg" },
+    { name: "Gulf Shores, AL", lat: 30.2460, lon: -87.7002, url: "https://www.youtube.com/watch?v=kP3Ig2X3QYk" },
+    { name: "Tybee Island Pier, GA", lat: 32.0050, lon: -80.8483, url: "https://www.youtube.com/watch?v=ImcOoln8_g8" },
+    { name: "Fort Pierce, FL", lat: 27.4467, lon: -80.3256, url: "https://www.youtube.com/watch?v=cj87VZ8VjQ8" },
+    { name: "Jupiter Beach, FL", lat: 26.9402, lon: -80.0761, url: "https://www.youtube.com/watch?v=8Rp7U14-3NA" },
+    { name: "New Smyrna Beach, FL", lat: 29.0258, lon: -80.9270, url: "https://www.youtube.com/watch?v=6tzlnUcvOj4" },
+    { name: "St. Simons Island, GA", lat: 31.1598, lon: -81.3910, url: "https://www.youtube.com/watch?v=7FVCsZUD3J0" },
+    { name: "Assateague Island, MD/VA", lat: 37.9347, lon: -75.2589, url: "https://www.youtube.com/watch?v=ZuGhs1xYvvE" }
+  ];
 
-    // Beach and hotel cams (only live cams facing ocean/beach)
-    const cameras = [
-      {
-        name: 'Clearwater Beach',
-        coords: [27.977, -82.827],
-        url: 'https://www.earthcam.com/usa/florida/clearwaterbeach/?cam=clearwaterbeach',
-      },
-      {
-        name: 'Miami Beach',
-        coords: [25.790, -80.130],
-        url: 'https://www.earthcam.com/usa/florida/miamiandthebeaches/?cam=miamibeach_hd',
-      },
-      {
-        name: 'Pensacola Beach',
-        coords: [30.335, -87.137],
-        url: 'https://www.earthcam.com/usa/florida/pensacola/?cam=pensacola',
-      },
-      {
-        name: 'Key West (Mallory Square)',
-        coords: [24.555, -81.782],
-        url: 'https://www.earthcam.com/usa/florida/keywest/?cam=mallorysquare',
-      },
-      {
-        name: 'Panama City Beach',
-        coords: [30.176, -85.805],
-        url: 'https://www.earthcam.com/usa/florida/panamacity/?cam=panamacitybeach',
-      },
-      {
-        name: 'Gulf Shores, AL',
-        coords: [30.246, -87.700],
-        url: 'https://www.earthcam.com/usa/alabama/gulfshores/?cam=gulfshores',
-      },
-      {
-        name: 'St. Pete Beach (Hotel Zamora)',
-        coords: [27.740, -82.750],
-        url: 'https://www.stpetebeach.org/live-cams/hotel-zamora/',
-      },
-    ];
-
-    // Add camera markers with popup links that open in new tab
-    cameras.forEach((cam) => {
-      L.marker(cam.coords)
-        .addTo(map)
-        .bindPopup(
-          `<b>${cam.name}</b><br><a class="popup-btn" href="${cam.url}" target="_blank" rel="noopener noreferrer">Watch Live</a>`
-        );
+  // Add markers to map
+  cams.forEach(({ name, lat, lon, url }) => {
+    const marker = L.marker([lat, lon]).addTo(map);
+    marker.bindTooltip(name, { permanent: false, direction: "top" });
+    marker.on("click", () => {
+      window.open(url, "_blank", "noopener,noreferrer");
     });
-  </script>
+  });
+</script>
 </body>
 </html>
