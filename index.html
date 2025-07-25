@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Storm Map with Radar + Live Cams</title>
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-sA+e2q4zQz38k0Z6kYoPr2ey1DmBp3p10+F3uD+ZfGk="
+  crossorigin=""
+/>
+<style>
+  body, html { margin: 0; padding: 0; height: 100%; }
+  #map { width: 100%; height: 100vh; }
+  #toggleRadarBtn {
+    position: absolute;
+    top: 10px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: white;
+    padding: 8px 12px;
+    border: 1px solid #666;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+  }
+</style>
+</head>
+<body>
+
+<div id="toggleRadarBtn">Toggle Radar</div>
+<div id="map"></div>
+
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-o9N1j7Y0vF3fZ8QtQTlJSow0RdU+Rs0rbDx+FfMWo0M="
+  crossorigin=""
+></script>
+<script>
+  // Initialize map
+  const map = L.map('map').setView([28.5, -82.5], 6); // Center on Florida / US South Coast
+
+  // Base tile layer
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  // Radar overlay from OpenWeatherMap (Free Demo)
+  const radarLayer = L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22', {
+    opacity: 0.5,
+    attribution: '&copy; OpenWeatherMap'
+  });
+
+  let radarVisible = false;
+
+  document.getElementById('toggleRadarBtn').addEventListener('click', () => {
+    if (radarVisible) {
+      map.removeLayer(radarLayer);
+      radarVisible = false;
+    } else {
+      map.addLayer(radarLayer);
+      radarVisible = true;
+    }
+  });
+
+  // Camera pins data: Replace or add your live cams here with [lat, lon, url, color]
+  const cams = [
+    // Florida Keys (red)
+    [24.5551, -81.7800, 'https://floridakeyswebcams.tv/key-west-cam/', 'red'],
+    [25.0111, -80.3578, 'https://www.keywestlivecam.com/', 'red'],
+
+    // US South Coast (orange)
+    [30.3322, -81.6557, 'https://www.jacksonville.com/live-beach-cam', 'orange'],
+    [29.9511, -90.0715, 'https://www.nola.com/weather/live-beach-cam/', 'orange'],
+
+    // Atlantic Coast up to NJ (blue)
+    [40.7128, -74.0060, 'https://www.nycgovparks.org/parks/riis-beach/webcams', 'blue'],
+    [39.2904, -74.6090, 'https://www.capemay.com/webcam', 'blue'],
+
+    // Caribbean Islands (green)
+    [18.2206, -66.5901, 'https://www.prtourism.com/webcams', 'green'],
+    [19.3380, -81.2546, 'https://www.grandcayman.com/webcam', 'green']
+  ];
+
+  cams.forEach(([lat, lon, url, color]) => {
+    const marker = L.circleMarker([lat, lon], {
+      radius: 8,
+      fillColor: color,
+      color: '#000',
+      weight: 1,
+      opacity: 1,
+      fillOpacity: 0.8,
+      cursor: 'pointer'
+    }).addTo(map);
+
+    marker.on('click', () => {
+      window.open(url, '_blank', 'noopener');
+    });
+
+    marker.bindTooltip(url, { direction: 'top', offset: [0, -10], opacity: 0.7 });
+  });
+
+</script>
+
+</body>
+</html>
